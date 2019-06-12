@@ -9,6 +9,8 @@ import os
 import numpy as np
 
 import matplotlib.pyplot as plt
+plt.rcParams['font.sans-serif']=['SimHei']
+plt.rcParams['axes.unicode_minus']=False
 import pandas as pd
 import pywt
 from pandas import DataFrame, Series
@@ -87,7 +89,7 @@ def programmer_3():
     w = [1.0 * i / k for i in range(k + 1)]
     # percentiles表示特定百分位数，同四分位数
     w = data.describe(percentiles=w)[4:4 + k + 1]
-    w[0] = w[0] * (1 - 1e-10)
+    w[0] = w[0] * (1 - 1e-10)   # 区间原因所以要把最小值再缩小一点
     d2 = pd.cut(data, w, labels=range(k))
 
     #　方法三，使用Kmeans
@@ -103,16 +105,18 @@ def programmer_3():
     w = [0] + list(w[0]) + [data.max()]
     d3 = pd.cut(data, w, labels=range(k))
 
-    def cluster_plot(d, k):
+    def cluster_plot(d, k,title):
         plt.figure(figsize=(8, 3))
         for j in range(0, k):
             plt.plot(data[d == j], [j for i in d[d == j]], 'o')
         plt.ylim(-0.5, k - 0.5)
-        return plt
+        plt.title(title)
+        plt.savefig('./img/%s.png'%title,dpi=200)
+        #return plt
 
-    cluster_plot(d1, k).show()
-    cluster_plot(d2, k).show()
-    cluster_plot(d3, k).show()
+    cluster_plot(d1, k,'等宽离散化结果')
+    cluster_plot(d2, k,'等频离散化结果')
+    cluster_plot(d3, k,'聚类离散化结果')
 
 
 def programmer_4():
@@ -137,26 +141,36 @@ def programmer_5():
     print(coeffs)
 
 
-def programmer_6():
+def programmer_6(n=None):
     inputfile = path + "/data/principal_component.xls"
-    outputfile = "/tmp/dimention_reducted.xls"
+    outputfile = path + "/tmp/dimention_reducted.xls"
 
     data = pd.read_excel(inputfile, header=None)
-
-    pca = PCA()
-    pca.fit(data)
-    # 返回各个模型的特征向量
-    pca.components_
-    # 返回各个成分各自的方差百分比
-    pca.explained_variance_ratio_
-    data.to_excel(outputfile, index=False)
+    
+    if n==None:
+        pca = PCA()
+        pca.fit(data)
+        # 返回各个模型的特征向量
+        print(pca.components_)
+        # 返回各个成分各自的方差百分比
+        print(pca.explained_variance_ratio_)
+        data.to_excel(outputfile, index=False,header=False)
+    else:
+        pca=PCA(n)
+        pca.fit(data)
+        # 返回各个模型的特征向量
+        low_d=pca.transform(data)
+        # 返回各个成分各自的方差百分比
+        pd.DataFrame(low_d).to_excel(outputfile,index=False,header=False)
+        print(pca.inverse_transform(low_d))   # 复原数据
 
 
 if __name__ == '__main__':
     programmer_1()
-    # programmer_2()
-    # programmer_3()
-    # programmer_4()
-    # programmer_5()
-    # programmer_6()
-    pass
+    programmer_2()
+    programmer_3()
+    programmer_4()
+    programmer_5()
+    programmer_6()
+    programmer_6(3)
+    #pass
