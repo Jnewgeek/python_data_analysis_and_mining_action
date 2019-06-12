@@ -16,9 +16,15 @@ from scipy.interpolate import lagrange
 from scipy.io import loadmat  # mat是MATLAB的专用格式，调用loadmat方法读取
 from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
+import warnings
+warnings.filterwarnings('ignore')
 """
 代码说明：
 ployinterp_column-->拉格朗日填充数值
+
+修改拉格朗日插值法函数,原始函数结果与《Python数据分析与挖掘》差异较大,
+且有错误值.
+
 programmer_1-->筛选异常数据（包括NaN）进行填充
 programmer_2-->最小-最大规范化、零-均值规范化、小数定标规范化
 programmer_4-->基本的dataframe操作
@@ -27,28 +33,35 @@ programmer_6-->利用PCA计算特征向量，用于降维分析
 """
 path = os.getcwd()
 
+for i in ['./data','./img','./tmp']:
+    if not os.path.exists(i):
+        os.mkdir(i)
+
 def programmer_1():
     inputfile = path + '/data/catering_sale.xls'
     outputfile = path + '/tmp/sales.xls'
 
     data = pd.read_excel(inputfile)
+    
+    # 重新排序
+    data=data.sort_values(by='日期').reset_index(drop=True)
+    
+    # 新增一列对比原始数据
+    data['销量_new']=data['销量']
 
-    data[(data[u'销量'] < 400) | (data[u'销量'] > 5000)] = None
+    data['销量_new'][(data['销量_new'] < 400) | (data['销量_new'] > 5000)] = None
 
     def ployinterp_column(index, df, k=5):
-        y = df[list(range(index - k, index))
-               + list(range(index + 1, index + 1 + k))]
+        y = df[list(range(index - k,index + 1 + k))]
         y = y[y.notnull()]
-        return lagrange(y.index, list(y))(index)
+        return lagrange([i-(index-k)+1 for i in y.index], list(y))(int((2+len(y))/2))
 
-    df = data[data[u'销量'].isnull()]
+    df = data[data['销量_new'].isnull()]
 
-    index_list = df[u'销量'].index
+    for index in df.index:
+        data['销量_new'][index] = ployinterp_column(index, data['销量_new'])
 
-    for index in index_list:
-        data[[u'销量']][index] = ployinterp_column(index, data[u'销量'])
-
-    data.to_excel(outputfile)
+    data.to_excel(outputfile,index=False)
 
 
 def programmer_2():
@@ -140,7 +153,7 @@ def programmer_6():
 
 
 if __name__ == '__main__':
-    # programmer_1()
+    programmer_1()
     # programmer_2()
     # programmer_3()
     # programmer_4()
