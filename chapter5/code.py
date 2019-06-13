@@ -7,11 +7,14 @@ Created on Fri Oct 20 16:06:09 2017
 """
 
 import numpy as np
+np.seterr(divide='ignore',invalid='ignore')  # 解决偏自回归绘图错误的问题
 
 import matplotlib.pyplot as plt
+plt.rcParams['font.sans-serif']=['SimHei']
+plt.rcParams['axes.unicode_minus']=False
 import pandas as pd
-from keras.layers.core import Activation, Dense
-from keras.models import Sequential
+#from keras.layers.core import Activation, Dense
+#from keras.models import Sequential
 from sklearn.cluster import KMeans
 from sklearn.linear_model import LogisticRegression as LR
 from sklearn.linear_model import RandomizedLogisticRegression as RLR
@@ -23,6 +26,13 @@ from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
 from statsmodels.stats.diagnostic import acorr_ljungbox
 from statsmodels.tsa.arima_model import ARIMA
 from statsmodels.tsa.stattools import adfuller as ADF
+
+import warnings
+warnings.filterwarnings('ignore')
+
+import os
+os.chdir(os.getcwd())
+
 """
 programmer_1-->使用随机森林算出有效特征，使用线性回归计算相关系数
 programmer_2-->使用决策数模型，生成决策树过程并保存为dot文件，天气、周末、促销决定销量
@@ -40,7 +50,7 @@ programmer_8-->菜单中各个菜品的关联程度
 
 
 def programmer_1():
-    filename = "data/bankloan.xls"
+    filename = "./data/bankloan.xls"
     data = pd.read_excel(filename)
 
     x = data.iloc[:, :8].as_matrix()
@@ -51,8 +61,7 @@ def programmer_1():
     rlr_support = rlr.get_support()
     support_col = data.drop('违约', axis=1).columns[rlr_support]
 
-    print(
-        "rlr_support_columns: {columns}".format(columns=','.join(support_col)))
+    print("rlr_support_columns: {columns}".format(columns=','.join(support_col)))
     x = data[support_col].as_matrix()
 
     lr = LR()
@@ -62,7 +71,7 @@ def programmer_1():
 
 
 def programmer_2():
-    inputfile = "data/sales_data.xls"
+    inputfile = "./data/sales_data.xls"
     data = pd.read_excel(inputfile, index_col=u'序号')
 
     data[data == u'是'] = 1
@@ -82,7 +91,7 @@ def programmer_2():
 
 
 def programmer_3():
-    inputfile = "data/sales_data.xls"
+    inputfile = "./data/sales_data.xls"
     data = pd.read_excel(inputfile, index_col=u'序号')
 
     data[data == u'好'] = 1
@@ -127,7 +136,7 @@ def programmer_3():
 
 
 def programmer_4():
-    inputfile = 'data/consumption_data.xls'
+    inputfile = './data/consumption_data.xls'
     outputfile = 'tmp/data_type.xls'
     """
     k: 聚类类别
@@ -155,17 +164,22 @@ def programmer_4():
     r.columns = list(data.columns) + [u'聚类类别']
     r.to_excel(outputfile)
 
-    def density_plot(data, k):
-        p = data.plot(kind='kde', linewidth=2, subplots=True, sharex=False)
+    def density_plot(data, k,title):
+        #fig=plt.figure()
+        #fig.suptitle(title)
+        #ax=fig.add_subplot(111)
+        p = data.plot(kind='kde', linewidth=2, subplots=True, sharex=False,grid=True)
         [p[i].set_ylabel(u'密度') for i in range(k)]
+        #ax.grid(linestyle='--',alpha=0.8)
         plt.legend()
+        plt.tight_layout()
         return plt
 
     # 保存概率密度图
-    pic_output = 'tmp/pd_'
+    pic_output = 'img/分群_'
     for i in range(k):
         density_plot(data[r[u'聚类类别'] == i],
-                     k).savefig(u'%s%s.png' % (pic_output, i))
+                     k,'分群_%s密度图'%(i+1)).savefig(u'%s%s.png' % (pic_output, i+1))
 
     return data_zs, r
 
@@ -183,10 +197,11 @@ def programmer_5(data_zs, r):
     plt.plot(d[0], d[1], 'go')
     d = tsne[r[u'聚类类别'] == 2]
     plt.plot(d[0], d[1], 'b*')
-    plt.show()
+    plt.title('聚类效果图')
+    plt.savefig('img/聚类效果图.png',dpi=200)
 
 
-def programmer_6():
+def programmer_6(forecastnum=5):
     """
     警告解释：
     # UserWarning: matplotlib is currently using a non-GUI backend, so cannot show the figure
@@ -201,14 +216,23 @@ def programmer_6():
     plot_acf().show()-->自相关图
     plot_pacf().show()-->偏自相关图
     """
-    discfile = 'data/arima_data.xls'
-    forecastnum = 5
+    discfile = './data/arima_data.xls'
+    forecastnum = forecastnum
     data = pd.read_excel(discfile, index_col=u'日期')
-
-    fig = plt.figure(figsize=(8, 6))
+    
+    # 销量图
+    fig,axes = plt.subplots(3,1,figsize=(6, 9))
     # 第一幅自相关图
-    ax1 = plt.subplot(411)
-    fig = plot_acf(data, ax=ax1)
+    data.plot(title='原始序列的时序图',ax=axes[0])
+    # 自相关
+    plot_acf(data, ax=axes[1])
+    # 偏自相关
+    plot_pacf(data, ax=axes[2])
+    # 绘制网格线
+    [i.grid(axis='y',linestyle='--',alpha=0.8) for i in axes]
+    # 保存图形
+    plt.tight_layout()
+    plt.savefig('img/原始序列的时序、自相关、偏自相关图.png',dpi=200)
 
     # 平稳性检测
     print(u'原始序列的ADF检验结果为：', ADF(data[u'销量']))
@@ -217,18 +241,21 @@ def programmer_6():
     # 差分后的结果
     D_data = data.diff().dropna()
     D_data.columns = [u'销量差分']
+    # 将负数转换为正数
+    #D_data['销量差分']=D_data['销量差分'].apply(lambda x:x if x>0 else -x)
     # 时序图
-    D_data.plot()
-    plt.show()
+    fig,axes = plt.subplots(3,1,figsize=(6, 9))
+    D_data.plot(title='一阶差分之后序列的时序图',ax=axes[0])
     # 第二幅自相关图
-    fig = plt.figure(figsize=(8, 6))
-    ax2 = plt.subplot(412)
-    fig = plot_acf(D_data, ax=ax2)
+    plot_acf(D_data, ax=axes[1])
     # 偏自相关图
-    ax3 = plt.subplot(414)
-    fig = plot_pacf(D_data, ax=ax3)
-    plt.show()
-    fig.clf()
+    plot_pacf(D_data, ax=axes[2])
+    # 绘制网格线
+    [i.grid(axis='y',linestyle='--',alpha=0.8) for i in axes]
+    # 保存图形
+    plt.tight_layout()
+    plt.savefig('img/一阶差分后序列的时序、自相关、偏自相关图.png',dpi=200)
+    #fig.clf()
 
     print(u'差分序列的ADF检验结果为：', ADF(D_data[u'销量差分']))  # 平稳性检测
 
@@ -242,8 +269,8 @@ def programmer_6():
     data.dropna(inplace=True)
 
     # 存在部分报错，所以用try来跳过报错；存在warning，暂未解决使用warnings跳过
-    import warnings
-    warnings.filterwarnings('error')
+    #import warnings
+    #warnings.filterwarnings('error')
     for p in range(pmax + 1):
         tmp = []
         for q in range(qmax + 1):
@@ -258,8 +285,17 @@ def programmer_6():
     p, q = bic_matrix.stack().idxmin()
     print(u'BIC最小的p值和q值为：%s、%s' % (p, q))
     model = ARIMA(data, (p, 1, q)).fit()  # 建立ARIMA(0, 1, 1)模型
-    model.summary2()  # 给出一份模型报告
-    model.forecast(forecastnum)  # 作为期5天的预测，返回预测结果、标准误差、置信区间。
+    print('模型报告\n---------------------------------')
+    summary=model.summary2()
+    print(summary)  # 给出一份模型报告
+    print('预测结果\n---------------------------------')
+    result=model.forecast(forecastnum)
+    print(result)  # 作为期5天的预测，返回预测结果、标准误差、置信区间。
+    # 保存结果
+    with open('tmp/ARIMA_Report.txt','w',encoding='utf-8') as f:
+        f.write('模型报告\n---------------------------------\n'+
+                str(summary)+'\n预测结果\n---------------------------------\n'+str(result))
+    
 
 
 def programmer_7():
@@ -268,7 +304,7 @@ def programmer_7():
     threshold：离散点阈值
     iteration：聚类最大循环次数
     """
-    inputfile = 'data/consumption_data.xls'
+    inputfile = './data/consumption_data.xls'
     k = 3
     threshold = 2
     iteration = 500
@@ -299,7 +335,7 @@ def programmer_7():
     norm[norm <= threshold].plot(style='go')
     # 离群点
     discrete_points = norm[norm > threshold]
-    discrete_points.plot(style='ro')
+    discrete_points.plot(style='rx')
     # 标记离群点
     for i in range(len(discrete_points)):
         _id = discrete_points.index[i]
@@ -308,7 +344,9 @@ def programmer_7():
 
     plt.xlabel(u'编号')
     plt.ylabel(u'相对距离')
-    plt.show()
+    plt.title('离群点标记')
+    plt.grid(linestyle='--',alpha=0.8)
+    plt.savefig('img/离群点标记.png',dpi=200)
 
 
 def connect_string(x, ms):
@@ -379,7 +417,7 @@ def find_rule(d, support, confidence, ms=u'--'):
 
 
 def programmer_8():
-    inputfile = 'data/menu_orders.xls'
+    inputfile = './data/menu_orders.xls'
     outputfile = 'tmp/apriori_rules.xls'
     data = pd.read_excel(inputfile, header=None)
 
@@ -402,12 +440,12 @@ def programmer_8():
 
 
 if __name__ == "__main__":
-    # programmer_1()
-    # programmer_2()
-    # programmer_3()
-    # data_zs, r = programmer_4()
-    # programmer_5(data_zs, r)
-    # programmer_6()
-    # programmer_7()
-    # programmer_8()
+#    programmer_1()   # 逻辑回归
+#    programmer_2()   # 决策树
+#    programmer_3()   # 神经网络
+#    data_zs, r = programmer_4()  # K均值聚类
+#    programmer_5(data_zs, r)     # 聚类效果图
+#    programmer_6()               # 时间序列
+#    programmer_7()               # 离群点检测
+#    programmer_8()               # 关联规则
     pass
