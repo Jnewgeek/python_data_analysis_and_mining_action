@@ -39,8 +39,8 @@ for i in ['./data','./img','./tmp']:
     if not os.path.exists(i):
         os.mkdir(i)
 
-def programmer_1():
-    inputfile = path + '/data/catering_sale.xls'
+def programmer_1(method=1):
+    inputfile = path + '/data/catering_sale - 副本.xls'
     outputfile = path + '/tmp/sales.xls'
 
     data = pd.read_excel(inputfile)
@@ -52,11 +52,19 @@ def programmer_1():
     data['销量_new']=data['销量']
 
     data['销量_new'][(data['销量_new'] < 400) | (data['销量_new'] > 5000)] = None
+    
+    data['销量']=data['销量_new']
 
-    def ployinterp_column(index, df, k=5):
-        y = df[list(range(index - k,index + 1 + k))]
-        y = y[y.notnull()]
-        return lagrange([i-(index-k)+1 for i in y.index], list(y))(int((2+len(y))/2))
+    if method==1:
+        def ployinterp_column(n, s, k=5):
+            y = s[list(range(n - k, n)) + list(range(n + 1, n + 1 + k))]  # 取数
+            y = y[y.notnull()]  # 剔除空值
+            return lagrange(y.index, list(y))(n)  # 插值并返回插值结果
+    else:
+        def ployinterp_column(n, s, k=5):
+            y = s[list(range(n - k,n + 1 + k))]
+            y = y[y.notnull()]
+            return lagrange([i-(n-k-1) for i in y.index], list(y))(k+1)
 
     df = data[data['销量_new'].isnull()]
 
@@ -64,6 +72,8 @@ def programmer_1():
         data['销量_new'][index] = ployinterp_column(index, data['销量_new'])
 
     data.to_excel(outputfile,index=False)
+    
+    return data[data['销量'].isnull()]
 
 
 def programmer_2():
@@ -166,11 +176,12 @@ def programmer_6(n=None):
 
 
 if __name__ == '__main__':
-    programmer_1()
-    programmer_2()
-    programmer_3()
-    programmer_4()
-    programmer_5()
-    programmer_6()
-    programmer_6(3)
+    data1=programmer_1(method=1)
+    data2=programmer_1(method=2)
+#    programmer_2()
+#    programmer_3()
+#    programmer_4()
+#    programmer_5()
+#    programmer_6()
+#    programmer_6(3)
     #pass
