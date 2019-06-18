@@ -3,6 +3,8 @@
 from random import shuffle
 
 import matplotlib.pyplot as plt
+plt.rcParams['font.sans-serif']=['SimHei']
+plt.rcParams['axes.unicode_minus']=False
 import pandas as pd
 from keras.layers.core import Activation, Dense
 from keras.models import Sequential
@@ -10,6 +12,11 @@ from scipy.interpolate import lagrange
 from sklearn.externals import joblib
 from sklearn.metrics import confusion_matrix, roc_curve
 from sklearn.tree import DecisionTreeClassifier
+
+import os
+os.chdir(os.getcwd())
+import warnings
+warnings.filterwarnings('ignore')
 """
 cm_plot-->自定义混淆矩阵可视化
 programmer_1-->使用拉格朗日插值法进行插值
@@ -37,24 +44,30 @@ def cm_plot(y, yp):
     return plt
 
 
-def programmer_1():
-    inputfile = 'data/missing_data.xls'
-    outputfile = 'tmp/missing_data_processed.xls'
+def programmer_1(method=1):
+    inputfile = 'data/missing_data - 副本.xls'
+    outputfile = 'tmp/missing_data_processed_01.xls'
 
     data = pd.read_excel(inputfile, header=None)  # 读入数据
 
     # 自定义列向量插值函数
     # s为列向量，n为被插值的位置，k为取前后的数据个数，默认为5
-    def ployinterp_column(s, n, k=5):
-        y = s[list(range(n - k, n)) + list(range(n + 1, n + 1 + k))]  # 取数
-        y = y[y.notnull()]  # 剔除空值
-        return lagrange(y.index, list(y))(n)  # 插值并返回插值结果
+    if method==1:
+        def ployinterp_column(n, s, k=5):
+            y = s[list(range(n - k, n)) + list(range(n + 1, n + 1 + k))]  # 取数
+            y = y[y.notnull()]  # 剔除空值
+            return lagrange(y.index, list(y))(n)  # 插值并返回插值结果
+    else:
+        def ployinterp_column(n, s, k=5):
+            y = s[list(range(n - k,n + 1 + k))]
+            y = y[y.notnull()]
+            return lagrange([i-(n-k-1) for i in y.index], list(y))(k+1)
 
     # 逐个元素判断是否需要插值
     for i in data.columns:
         for j in range(len(data)):
             if (data[i].isnull())[j]:
-                data[i][j] = ployinterp_column(data[i], j)
+                data[i][j] = ployinterp_column(j,data[i])
 
     data.to_excel(outputfile, header=None, index=False)
 
@@ -142,7 +155,7 @@ def programmer_3():
 
 
 if __name__ == "__main__":
-    # programmer_1()
-    # programmer_2()
-    # programmer_3()
+#    programmer_1(method=2)   # 采用常规差值函数
+#    programmer_2()
+    programmer_3()
     pass
